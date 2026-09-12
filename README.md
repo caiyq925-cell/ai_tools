@@ -63,7 +63,7 @@
 前置条件：
 
 - Node.js ≥ 20
-- Rust 稳定版 + **MSVC 工具链**（Windows 上 GNU/MinGW 工具链链接会失败，仓库已用 `src-tauri/rust-toolchain.toml` 固定为 `stable-x86_64-pc-windows-msvc`）
+- Rust 稳定版 + **MSVC 工具链**（Windows 上 GNU/MinGW 工具链链接会失败）
 - Windows 需要 [WebView2 运行时](https://developer.microsoft.com/microsoft-edge/webview2/)（Win10/11 一般已自带）
 
 ```bash
@@ -79,19 +79,27 @@ npm run dev
 # 类型检查
 npm run typecheck
 
-# 打包安装程序（产物在 src-tauri/target/release/bundle/nsis）
+# 构建绿色版（推荐）：只编译 exe，不打包安装器
+# 构建完成后自动：① 复制到 portable/devkit.exe ② 在桌面创建 DevKit 快捷方式
+npm run app:portable
+
+# 打包安装程序（NSIS/MSI，Windows 安装器内嵌 WebView2 引导器 embedBootstrapper）
 npm run app:build
 ```
 
-### 构建产物
+### 构建产物与绿色版
 
-| 产物 | 路径 |
-| --- | --- |
-| 免安装可执行文件（约 5 MB） | `src-tauri/target/release/devkit.exe` |
-| NSIS 安装包 | `src-tauri/target/release/bundle/nsis/DevKit_0.1.0_x64-setup.exe` |
+`npm run app:portable` 在每次构建后自动完成两件事（逻辑见 `scripts/portable.js`）：
 
-桌面已创建 `DevKit.lnk` 快捷方式，直接指向 `devkit.exe`（图标取自 exe 内置图标）。
-release 版启动后**不显示窗口**，只在托盘常驻，按 <kbd>Alt</kbd> + <kbd>Space</kbd> 唤起即可。
+1. 把编译出的 `src-tauri/target/release/devkit.exe` 复制到 **`portable/devkit.exe`** —— 前端资源已内嵌的单文件绿色版（约 27 MB），无需安装、拷到任何 Win10/11 机器可直接运行；
+2. 在桌面创建 **`DevKit.lnk`** 快捷方式，指向绿色版 exe，双击即启动（release 版按 <kbd>Alt</kbd> + <kbd>Space</kbd> 唤起面板）。
+
+| 产物 | 路径 | 说明 |
+| --- | --- | --- |
+| 绿色版 exe | `portable/devkit.exe` | `app:portable` 自动输出，日常使用就用它 |
+| 编译原始产物 | `src-tauri/target/release/devkit.exe` | cargo 直接产物 |
+| NSIS / MSI 安装包 | `src-tauri/target/release/bundle/` | `app:build` 产出，安装时自动处理 WebView2 |
+| GitHub Release | 推送 `v*` 标签触发 | Actions 自动构建三平台安装包并挂到 release |
 
 ## 目录结构
 
@@ -107,17 +115,18 @@ src/
     code-tool.ts       「左输入 / 右输出」通用外壳
     time.ts json.ts xml.ts yaml.ts curl.ts mybatis.ts
 src-tauri/
-  src/lib.rs           窗口切换、全局快捷键、托盘、剪贴板
-  src/http.rs          HTTP 请求命令（reqwest，绕过 CORS）
-  tauri.conf.json      窗口与打包配置
+  src/lib.rs           全部 Tauri 命令：HTTP、剪贴板、应用列表/图标、网络信息、窗口控制、全局快捷键
+  tauri.conf.json      窗口与打包配置（embedBootstrapper）
+scripts/
+  portable.js          app:portable 后处理：输出绿色版 + 桌面快捷方式
 ```
 
 ## 实现说明
 
 - **全局快捷键与窗口切换在 Rust 侧完成**，只在按键按下时触发一次，避免抬起时重复切换。
-- **HTTP 请求由 Rust 发出**（`reqwest` + rustls），不受浏览器 CORS 限制，可自定义超时、忽略自签证书、控制是否跟随重定向。
+- **HTTP 请求由 Rust 发出**（`reqwest` + native-tls），不受浏览器 CORS 限制，可自定义超时、忽略自签证书、控制是否跟随重定向。
 - **前端不引入 UI 框架**，所有界面由 `dom.ts` 构造，打包体积小、首屏快。
-- 复制、剪贴板读取走 Tauri 官方插件，前端只调用自定义命令，无需额外权限声明。
+- HTTP、剪贴板、应用列表、网络信息均为 Rust 自定义命令，前端只通过 invoke 调用，无需额外权限声明。
 
 ## 已知限制
 

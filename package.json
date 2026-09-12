@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "app": "tauri dev",
-    "app:build": "tauri build"
+    "app:build": "tauri build",
+    "app:portable": "tauri build --no-bundle && node scripts/portable.js"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

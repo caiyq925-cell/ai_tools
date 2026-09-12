@@ -21,3 +21,6 @@ src-tauri/gen
 # 日志
 *.log
 npm-debug.log*
+
+# 绿色版输出
+portable/
